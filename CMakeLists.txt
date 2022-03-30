@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 3.10.0)
 project(fast_gicp)
 
 option(BUILD_VGICP_CUDA "Build GPU-powered VGICP" ON)
-option(BUILD_apps "Build application programs" ON)
-option(BUILD_test "Build test programs" OFF)
-option(BUILD_PYTHON_BINDINGS "Build python bindings" OFF)
 
 if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
 else()
@@ -17,10 +14,7 @@ set(CMAKE_BUILD_TYPE "Release")
 
 find_package(PCL REQUIRED)
 find_package(Eigen3 REQUIRED)
-
-if(NOT BUILD_PYTHON_BINDINGS)
-  find_package(catkin)
-endif()
+find_package(ament_cmake REQUIRED)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -32,16 +26,6 @@ if(BUILD_VGICP_CUDA)
   find_package(CUDA REQUIRED)
   include_directories(${CUDA_INCLUDE_DIRS})
   link_directories(${CUDA_LIBRARY_DIRS})
-endif()
-
-###################################
-## catkin specific configuration ##
-###################################
-if(catkin_FOUND)
-  catkin_package(
-    INCLUDE_DIRS include
-    LIBRARIES fast_gicp
-  )
 endif()
 
 ###########
@@ -62,39 +46,6 @@ target_include_directories(fast_gicp PUBLIC
   ${PCL_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
 )
-
-### APPS ###
-if(BUILD_apps)
-  add_executable(gicp_align src/align.cpp)
-  add_dependencies(gicp_align fast_gicp)
-  target_link_libraries(gicp_align
-    ${PCL_LIBRARIES}
-    fast_gicp
-  )
-
-  add_executable(gicp_kitti src/kitti.cpp)
-  add_dependencies(gicp_kitti fast_gicp)
-  target_link_libraries(gicp_kitti
-    ${PCL_LIBRARIES}
-    fast_gicp
-  )
-endif()
-
-### Python bindings ###
-if(BUILD_PYTHON_BINDINGS)
-  add_subdirectory(thirdparty/pybind11)
-  pybind11_add_module(pygicp
-    src/python/main.cpp
-  )
-  target_include_directories(pygicp PUBLIC
-    include
-    ${PCL_INCLUDE_DIRS}
-    ${EIGEN3_INCLUDE_DIR}
-  )
-  target_link_libraries(pygicp PRIVATE
-    fast_gicp
-  )
-endif()
 
 ### CUDA ###
 if(BUILD_VGICP_CUDA)
@@ -118,10 +69,6 @@ if(BUILD_VGICP_CUDA)
     include
     thirdparty/Eigen
     thirdparty/nvbio
-    ${catkin_INCLUDE_DIRS}
-  )
-  target_link_libraries(fast_vgicp_cuda
-    ${catkin_LIBRARIES}
   )
   cuda_add_cublas_to_target(fast_vgicp_cuda)
 
@@ -134,27 +81,10 @@ if(BUILD_VGICP_CUDA)
     fast_vgicp_cuda
   )
   add_dependencies(fast_gicp fast_vgicp_cuda)
-  if(catkin_FOUND)
-    install(TARGETS fast_vgicp_cuda  
-      LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
-  endif()
+  install(TARGETS fast_vgicp_cuda  
+    LIBRARY DESTINATION lib)
+  install(TARGETS fast_gicp
+    LIBRARY DESTINATION lib)
 endif()
 
-### TEST ###
-if(BUILD_test)
-  find_package(GTest REQUIRED)
-
-  add_executable(gicp_test src/test/gicp_test.cpp)
-  add_dependencies(gicp_test fast_gicp)
-  target_link_libraries(gicp_test ${GTEST_LIBRARIES} ${PCL_LIBRARIES} fast_gicp)
-  gtest_add_tests(TARGET gicp_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} EXTRA_ARGS "${CMAKE_SOURCE_DIR}/data")
-endif()
-
-if(catkin_FOUND)
-  install(TARGETS ${PROJECT_NAME}
-    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
-  
-  install(DIRECTORY include/
-    DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
-    FILES_MATCHING PATTERN "*.hpp")
-endif()
+ament_package()
